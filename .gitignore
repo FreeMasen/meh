@@ -1,0 +1,8 @@
+/target
+**/*.rs.bk
+apikey
+meh
+meh.exe
+alert.ps1
+alert.sh
+out.*
