@@ -1,48 +1,56 @@
 static KEY: &str = include_str!("../apikey");
 use chrono::{DateTime, Utc};
-use indicatif::{ProgressBar, ProgressStyle};
+use indicatif::{ProgressBar, ProgressStyle, MultiProgress};
 use serde::Deserialize;
-#[cfg(windows)]
-static CMD: &str = "./alert.ps1";
-#[cfg(unix)]
-static CMD: &str = "./alert.sh";
+
+
+static mut MULTI: Option<MultiProgress> = None;
+static mut TOP_BAR: Option<ProgressBar> = None;
+static mut MIDDLE_BAR: Option<ProgressBar> = None;
+static mut BOTTOM_BAR: Option<ProgressBar> = None;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let url = format!("https://api.meh.com/1/current.json?apikey={}", KEY);
     let mut sleep_time = chrono::Duration::zero();
     let mut last_id: String = String::new();
-    let style = ProgressStyle::default_spinner()
-        .tick_chars("█▓▒░ ░▒▓█")
-        .template("{prefix:.bold.dim} {spinner} {wide_msg}");
-    let bar = ProgressBar::new_spinner();
-    bar.set_style(style.clone());
-    let bar2 = ProgressBar::new_spinner();
-    bar2.set_style(style.clone());
-    let bar3 = ProgressBar::new_spinner();
-    bar3.set_style(style.clone());
-    let multi = indicatif::MultiProgress::new();
-    let bar3 = multi.add(bar3);
-    let bar2 = multi.add(bar2);
-    let mut bar = multi.add(bar);
-    let should_alert = std::path::Path::new(CMD).exists();
-    std::thread::spawn(move || {
-        bar.set_message("Warming up!");
-        bar.enable_steady_tick(200);
-        bar2.enable_steady_tick(200);
-        bar3.enable_steady_tick(200);
+    let args = clap_args();
+    let alert_path = if let Some(path) = args.value_of("alert") {
+        Some(path.to_string())
+    } else {
+        None
+    };
+    let progress = if args.is_present("progress") {
+        setup_bars();
+        true
+    } else {
+        false
+    };
+    let thread = std::thread::spawn(move || {
+        if progress {
+            update_bottom_bar("Warming up!");
+            start_bar_tick();
+        }
         loop {
             if sleep_time <= chrono::Duration::zero() {
-                bar.set_message("Requesting info from Meh.com");
-                sleep_time = if let Some(res) = get_response(&url, &mut bar) {
+                if progress {
+                    update_bottom_bar("Requesting info from Meh.com");
+                }
+                sleep_time = if let Some(res) = get_response(&url) {
                     if res.deal.id != last_id {
                         let (line1, line2) = format_deal(&res.deal);
-                        if should_alert {
-                            alert(&format!("{}\n{}", line1, line2));
+                        if let Some(ref p) = alert_path {
+                            alert(&line1, &line2, p);
                         }
-                        bar3.set_message(&line1);
-                        bar2.set_message(&line2);
+                        if progress {
+                            update_top_bar(&line1);
+                            update_middle_bar(&line2);
+                        }
                         last_id = res.deal.id;
-                        res.deal.end_date - Utc::now()
+                        if let Some(end_date) = res.deal.end_date {
+                            end_date - Utc::now()
+                        } else {
+                            duration_until_midnight_eastern()
+                        }
                     } else {
                         chrono::Duration::minutes(1)
                     }
@@ -50,15 +58,123 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                     chrono::Duration::minutes(1)
                 };
             }
-            sleep(sleep_time, &mut bar);
+            sleep(sleep_time);
             sleep_time = chrono::Duration::zero();
         }
     });
-    multi.join()?;
+    if progress {
+        join_bars();
+    } else {
+        thread.join().unwrap();
+    }
     Ok(())
 }
 
-fn get_response(url: &str, bar: &mut ProgressBar) -> Option<Response> {
+fn clap_args<'a>() -> clap::ArgMatches<'a> {
+    clap::App::new("meh")
+        .about("A cli tool for watching meh.com deals")
+        .args(&[
+            clap::Arg::with_name("alert")
+                .long("alert")
+                .short("a")
+                .takes_value(true)
+                .required(false)
+                .number_of_values(1)
+                .help("path to file that should be executed when the deal changes")
+                .long_help("On windows this will be executed through powershell, on unix like it will executed directly")
+                .value_name("FILE"),
+            clap::Arg::with_name("progress")
+                .long("progress")
+                .short("p")
+                .takes_value(false)
+                .required(false)
+                .help("if the cli should constantly report the current deal and when the next check will happen")
+                .long_help("This is useful for active monitoring, if not passed you may want to pass the alert otherwise the application will not have any way to communicate"),
+        ])
+        .get_matches()
+}
+
+fn setup_bars() {
+    use std::sync::Once;
+    static SETUP: Once = Once::new();
+    SETUP.call_once(|| {
+        let style = ProgressStyle::default_spinner()
+            .tick_chars("█▓▒░  ░▒▓█")
+            .template("{prefix:.bold.dim} {spinner} {wide_msg}");
+        let bottom = ProgressBar::new_spinner().with_style(style.clone());
+        let middle = ProgressBar::new_spinner().with_style(style.clone());
+        let top = ProgressBar::new_spinner().with_style(style);
+        let multi = MultiProgress::new();
+        unsafe {
+            TOP_BAR = Some(multi.add(top));
+            MIDDLE_BAR = Some(multi.add(middle));
+            BOTTOM_BAR = Some(multi.add(bottom));
+            MULTI = Some(multi);
+        }
+    });
+}
+
+fn start_bar_tick() {
+    let tick = 200;
+    unsafe {
+        if let Some(ref b) = BOTTOM_BAR {
+            b.enable_steady_tick(tick)
+        }
+        if let Some(ref b) = MIDDLE_BAR {
+            b.enable_steady_tick(tick)
+        }
+        if let Some(ref b) = TOP_BAR {
+            b.enable_steady_tick(tick)
+        }
+    }
+}
+
+fn update_bottom_bar(msg: &str) {
+    unsafe {
+        update_bar(msg, &BOTTOM_BAR)
+    }
+}
+
+fn update_middle_bar(msg: &str) {
+    unsafe {
+        update_bar(msg, &MIDDLE_BAR)
+    }
+}
+fn update_top_bar(msg: &str) {
+    unsafe {
+        update_bar(msg, &TOP_BAR)
+    }
+}
+
+fn update_bar(msg: &str, bar: &Option<ProgressBar>){
+    if let Some(ref b) = bar {
+        b.set_message(msg)
+    }
+}
+
+fn join_bars() {
+    unsafe {
+        if let Some(ref b) = MULTI {
+            b.join().unwrap();
+        }
+    }
+}
+
+fn duration_until_midnight_eastern() -> chrono::Duration {
+    use chrono::{TimeZone, Datelike};
+    use std::ops::Add;
+    let hour = 3600;
+    
+    let offset = chrono::FixedOffset::west(hour * 5);
+    let now = Utc::now().with_timezone(&offset);
+    let tomorrow = now.add(chrono::Duration::days(1));
+    let midnight_est = offset
+        .ymd(tomorrow.year(), tomorrow.month(), tomorrow.day())
+        .and_hms(0, 0, 0);
+    midnight_est.signed_duration_since(now)
+}
+
+fn get_response(url: &str) -> Option<Response> {
     let res_text = get_text(url)
         .map_err(|e| {
             eprintln!("Error getting response text {}", e);
@@ -67,7 +183,7 @@ fn get_response(url: &str, bar: &mut ProgressBar) -> Option<Response> {
     match serde_json::from_str(&res_text) {
         Ok(r) => Some(r),
         Err(e) => {
-            bar.println(&format!("Error deserializng: {}", e));
+            eprintln!("Error deserializng: {}", e);
             eprintln!("{}", res_text);
             None
         }
@@ -79,7 +195,7 @@ fn get_text(url: &str) -> Result<String, Box<dyn std::error::Error>> {
     Ok(ret)
 }
 
-fn sleep(duration: chrono::Duration, bar: &mut ProgressBar) {
+fn sleep(duration: chrono::Duration) {
     use std::ops::Add;
     let end = Utc::now().add(duration);
     let one_hour: chrono::Duration = chrono::Duration::hours(1);
@@ -107,7 +223,7 @@ fn sleep(duration: chrono::Duration, bar: &mut ProgressBar) {
         } else {
             break;
         };
-        bar.set_message(&format!("checking again in {}", when));
+        update_bottom_bar(&format!("checking again in {}", when));
         std::thread::sleep(how_long.to_std().unwrap());
     }
 }
@@ -123,19 +239,24 @@ fn format_time(date: DateTime<Utc>) -> String {
     format!("{}", local_time.format("%-l:%M %p"))
 }
 #[cfg(windows)]
-fn alert(msg: &str) {
-    let local_msg = format!("{:?}", msg);
+fn alert(line_one: &str, line_two: &str, path: &str) {
+    let local_msg = format!(r#""{}
+{}""#, line_one, line_two);
+    let local_path = path.to_string();
     std::thread::spawn(move || {
         let _ = std::process::Command::new("powershell")
-            .arg(CMD)
-            .arg(&local_msg);
+            .arg(&local_path)
+            .arg(&local_msg)
+            .output();
     });
 }
 #[cfg(unix)]
-fn alert(msg: &str) {
-    let local_msg = format!("{:?}", msg);
+fn alert(line_one: &str, line_two: &str, path: &str) {
+    let local_msg = format!(r#""{}\\n{}""#, line_one, line_two);
+    let local_path = path.to_string();
     std::thread::spawn(move || {
-        let _ = std::process::Command::new(CMD).arg(&local_msg);
+        let _ = std::process::Command::new(&local_path).arg(&local_msg)
+        .output();
     });
 }
 
@@ -158,8 +279,9 @@ struct Deal {
     story: Story,
     theme: Theme,
     url: String,
-    end_date: DateTime<Utc>,
+    end_date: Option<DateTime<Utc>>,
 }
+
 #[derive(Debug, Deserialize)]
 struct Item {
     attributes: Vec<Attribute>,
@@ -171,7 +293,7 @@ struct Item {
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct Launch {
-    sold_out_at: String,
+    sold_out_at: Option<DateTime<Utc>>,
 }
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
