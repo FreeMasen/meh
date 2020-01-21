@@ -80,16 +80,18 @@ fn clap_args<'a>() -> clap::ArgMatches<'a> {
                 .takes_value(true)
                 .required(false)
                 .number_of_values(1)
-                .help("path to file that should be executed when the deal changes")
-                .long_help("On windows this will be executed through powershell, on unix like it will executed directly")
+                .help("Path to file that should be executed when the deal changes")
+                .long_help("Path to file that should be executed when the deal changes \
+                On windows this will be executed through powershell, on unix like it will executed directly")
                 .value_name("FILE"),
             clap::Arg::with_name("progress")
                 .long("progress")
                 .short("p")
                 .takes_value(false)
                 .required(false)
-                .help("if the cli should constantly report the current deal and when the next check will happen")
-                .long_help("This is useful for active monitoring, if not passed you may want to pass the alert otherwise the application will not have any way to communicate"),
+                .help("If the cli should constantly report the current deal and when the next check will happen")
+                .long_help("If the cli should constantly report the current deal and when the next check will happen \
+                This is useful for active monitoring, if not passed you may want to pass the alert otherwise the application will not have any way to communicate"),
         ])
         .get_matches()
 }
