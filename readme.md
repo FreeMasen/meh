@@ -38,6 +38,8 @@ updated periodically.
 
 When the `--alert` argument is provided, the program will attempt to execute the provided file (powershell on windows and sh on unix) when the deal changes.
 
+Regardless of the operating system, a single argument will be passed that will include the current deal's title and the dolar amounts (if multiple price points all will be included).
+
 ### Alert Example
 #### Windows
 ```powershell
@@ -50,7 +52,7 @@ $global:balmsg = New-Object System.Windows.Forms.NotifyIcon
 $path = (Get-Process -id $pid).Path
 $balmsg.Icon = [System.Drawing.Icon]::ExtractAssociatedIcon($path)
 $balmsg.BalloonTipIcon = [System.Windows.Forms.ToolTipIcon]::Warning
-$balmsg.BalloonTipText = ($MSG -Split '\n')[0]
+$balmsg.BalloonTipText = $MSG
 $balmsg.BalloonTipTitle = "New MEH Deal"
 $balmsg.Visible = $true
 Remove-Event notification_event -ea SilentlyContinue

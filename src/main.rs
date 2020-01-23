@@ -1,8 +1,8 @@
 static KEY: &str = include_str!("../apikey");
 use chrono::{DateTime, Utc};
-use indicatif::{ProgressBar, ProgressStyle, MultiProgress};
+use indicatif::{MultiProgress, ProgressBar, ProgressStyle};
+use log::debug;
 use serde::Deserialize;
-
 
 static mut MULTI: Option<MultiProgress> = None;
 static mut TOP_BAR: Option<ProgressBar> = None;
@@ -10,16 +10,26 @@ static mut MIDDLE_BAR: Option<ProgressBar> = None;
 static mut BOTTOM_BAR: Option<ProgressBar> = None;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
+    pretty_env_logger::init();
     let url = format!("https://api.meh.com/1/current.json?apikey={}", KEY);
     let mut sleep_time = chrono::Duration::zero();
     let mut last_id: String = String::new();
     let args = clap_args();
     let alert_path = if let Some(path) = args.value_of("alert") {
-        Some(path.to_string())
+        let p = std::path::PathBuf::from(path);
+        debug!("alert arg provided {}", p.display());
+        if p.exists() {
+            debug!("alert file exists");
+            Some(p.as_path().to_owned())
+        } else {
+            debug!("alert file does not exist");
+            None
+        }
     } else {
         None
     };
     let progress = if args.is_present("progress") {
+        debug!("progress flag was present");
         setup_bars();
         true
     } else {
@@ -35,8 +45,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 if progress {
                     update_bottom_bar("Requesting info from Meh.com");
                 }
+                debug!("requesting deal");
                 sleep_time = if let Some(res) = get_response(&url) {
                     if res.deal.id != last_id {
+                        debug!("new deal!");
                         let (line1, line2) = format_deal(&res.deal);
                         if let Some(ref p) = alert_path {
                             alert(&line1, &line2, p);
@@ -132,23 +144,17 @@ fn start_bar_tick() {
 }
 
 fn update_bottom_bar(msg: &str) {
-    unsafe {
-        update_bar(msg, &BOTTOM_BAR)
-    }
+    unsafe { update_bar(msg, &BOTTOM_BAR) }
 }
 
 fn update_middle_bar(msg: &str) {
-    unsafe {
-        update_bar(msg, &MIDDLE_BAR)
-    }
+    unsafe { update_bar(msg, &MIDDLE_BAR) }
 }
 fn update_top_bar(msg: &str) {
-    unsafe {
-        update_bar(msg, &TOP_BAR)
-    }
+    unsafe { update_bar(msg, &TOP_BAR) }
 }
 
-fn update_bar(msg: &str, bar: &Option<ProgressBar>){
+fn update_bar(msg: &str, bar: &Option<ProgressBar>) {
     if let Some(ref b) = bar {
         b.set_message(msg)
     }
@@ -163,10 +169,10 @@ fn join_bars() {
 }
 
 fn duration_until_midnight_eastern() -> chrono::Duration {
-    use chrono::{TimeZone, Datelike};
+    use chrono::{Datelike, TimeZone};
     use std::ops::Add;
     let hour = 3600;
-    
+
     let offset = chrono::FixedOffset::west(hour * 5);
     let now = Utc::now().with_timezone(&offset);
     let tomorrow = now.add(chrono::Duration::days(1));
@@ -241,9 +247,8 @@ fn format_time(date: DateTime<Utc>) -> String {
     format!("{}", local_time.format("%-l:%M %p"))
 }
 #[cfg(windows)]
-fn alert(line_one: &str, line_two: &str, path: &str) {
-    let local_msg = format!(r#""{}
-{}""#, line_one, line_two);
+fn alert(line_one: &str, _line_two: &str, path: &str) {
+    let local_msg = format!(r#""{}""#, line_one, line_two);
     let local_path = path.to_string();
     std::thread::spawn(move || {
         let _ = std::process::Command::new("powershell")
@@ -253,12 +258,20 @@ fn alert(line_one: &str, line_two: &str, path: &str) {
     });
 }
 #[cfg(unix)]
-fn alert(line_one: &str, line_two: &str, path: &str) {
-    let local_msg = format!(r#""{}\\n{}""#, line_one, line_two);
-    let local_path = path.to_string();
+fn alert(line_one: &str, _line_two: &str, path: &std::path::Path) {
+    let local_msg = format!(r#"{}"#, line_one);
+    let local_path = path.to_owned();
     std::thread::spawn(move || {
-        let _ = std::process::Command::new(&local_path).arg(&local_msg)
-        .output();
+        let out = std::process::Command::new("bash")
+            .arg(&local_path)
+            .arg(&local_msg)
+            .output()
+            .unwrap();
+        debug!(
+            "output:\n{}\n{}",
+            String::from_utf8_lossy(&out.stdout),
+            String::from_utf8_lossy(&out.stderr)
+        );
     });
 }
 
