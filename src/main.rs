@@ -48,19 +48,38 @@ mod bin {
         let url = format!("https://api.meh.com/1/current.json?apikey={}", KEY);
         let args = clap_args();
         if let Some(matches) = args.subcommand_matches("watch") {
-            let alert_info = match (args.value_of("alert"), args.value_of("alert_type")) {
-                (Some(path), Some(kind)) => Some((path.to_string(), kind.to_string())),
-                _ => None,
+            let alert_info = if let Some(alert) = matches.value_of("alert") {
+                let ty = matches.value_of("alert_type").unwrap_or_else(|| "title-price");
+                debug!("got alert args: {}, {}", alert, ty);
+                Some((alert.to_string(), ty.to_string()))
+            } else {
+                debug!("no alert args");
+                None
             };
             let progress = matches.is_present("progress");
-            watch(alert_info, progress, url)?;
+
+            let interval = if let Some(interval) = matches.value_of("interval") {
+                if let Ok(ms) = interval.parse() {
+                    Some(Duration::milliseconds(ms))
+                } else {
+                    None
+                }
+            } else {
+                None
+            };
+            watch(alert_info, progress, url, interval)?;
         } else {
             let json = get_text(&url)?;
             println!("{}", json);
         }
         Ok(())
     }
-    fn watch(alert_args: Option<(String, String)>, progress: bool, url: String) -> Result<(), Box<dyn std::error::Error>> {
+    fn watch(
+        alert_args: Option<(String, String)>,
+        progress: bool,
+        url: String,
+        interval: Option<Duration>,
+    ) -> Result<(), Box<dyn std::error::Error>> {
         let mut sleep_time = Duration::zero();
         let mut last_id: String = String::new();
         let alert_info = if let Some((path, kind)) = alert_args {
@@ -79,7 +98,7 @@ mod bin {
         if progress {
             setup_bars();
         }
-        
+
         let thread = std::thread::spawn(move || {
             if progress {
                 start_bar_tick();
@@ -96,6 +115,7 @@ mod bin {
                             debug!("new deal!");
                             let (line1, line2) = format_deal(&res.deal);
                             if let Some((p, kind)) = &alert_info {
+                                debug!("sending alert!");
                                 let _ = alert(&res, p, kind);
                             }
                             if progress {
@@ -103,7 +123,9 @@ mod bin {
                                 update_middle_bar(&line2);
                             }
                             last_id = res.deal.id;
-                            if let Some(end_date) = res.deal.end_date {
+                            if let Some(interval) = interval {
+                                interval
+                            } else if let Some(end_date) = res.deal.end_date {
                                 end_date - Utc::now()
                             } else {
                                 duration_until_midnight_eastern()
@@ -162,7 +184,20 @@ mod bin {
             .long_help("Shape of the alert argument. \
                 title: single line string with title only \
                 title-price: same as title but list of prices appended to the end \
-                json: json blob of the full resonse body")
+                json: json blob of the full resonse body"),
+            clap::Arg::with_name("interval")
+            .long("interval")
+            .short("i")
+            .takes_value(true)
+            .required(false)
+            .number_of_values(1)
+            .validator(|s| {
+                s.parse::<i64>().map_err(|_| "interval must be a number")?;
+                Ok(())
+            })
+            .help("How long to wait between checks")
+            .long_help("How long to wait between checks. \
+            If not provided, uses the expiration date of the response from meh")
             ]))
         .get_matches()
     }
@@ -305,11 +340,15 @@ mod bin {
         format!("{}", local_time.format("%-l:%M %p"))
     }
     #[cfg(windows)]
-    fn alert(response: &Response, path: &std::path::Path, kind: &str) -> Result<(), Box<dyn std::error::Error>> {
+    fn alert(
+        response: &Response,
+        path: &std::path::Path,
+        kind: &str,
+    ) -> Result<(), Box<dyn std::error::Error>> {
         let msg = match kind {
             "json" => serialize_json(response)?,
             "title-price" => format_deal(&deal).0,
-            _ => reqwest.deal.title.clone()
+            _ => reqwest.deal.title.clone(),
         };
         let local_path = path.to_owned();
         std::thread::spawn(move || {
@@ -321,11 +360,15 @@ mod bin {
         Ok(())
     }
     #[cfg(unix)]
-    fn alert(response: &Response, path: &std::path::Path, kind: &str) -> Result<(), Box<dyn std::error::Error>> {
+    fn alert(
+        response: &Response,
+        path: &std::path::Path,
+        kind: &str,
+    ) -> Result<(), Box<dyn std::error::Error>> {
         let msg = match kind {
             "json" => serialize_json(response)?,
             "title-price" => format_deal(&response.deal).0,
-            _ => response.deal.title.clone()
+            _ => response.deal.title.clone(),
         };
         let local_path = path.to_owned();
         std::thread::spawn(move || {

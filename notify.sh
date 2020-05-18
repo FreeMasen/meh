@@ -1,0 +1,1 @@
+/usr/bin/osascript -e "display notification \"$*\" with title \"Meh Update\" sound name \"Frog\""
