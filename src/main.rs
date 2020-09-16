@@ -196,7 +196,7 @@ mod bin {
                 Ok(())
             })
             .help("How long to wait between checks")
-            .long_help("How long to wait between checks. \
+            .long_help("How many ms to wait between checks. \
             If not provided, uses the expiration date of the response from meh")
             ]))
         .get_matches()
