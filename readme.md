@@ -166,10 +166,12 @@ cargo build --release --features bin
 ```
 
 
-#Why
+# Why
+
 During a Meh-ra-thon, I wanted to have a way to get my computer to alert me when the deal turned over, so I built this.
 
-#As a library
+# As a library
+
 Since this is a Rust program, you could also use the types defined here in your own Rust application. I am not planning
 on publishing this to Crates.io since it seems silly but you could use it like so:
 
