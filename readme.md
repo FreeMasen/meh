@@ -179,3 +179,5 @@ on publishing this to Crates.io since it seems silly but you could use it like s
 [dependencies]
 meh = { git = "https://github.com/FreeMasen/meh" }
 ```
+
+[see api docs for more info](https://freemasen.github.io/meh)
