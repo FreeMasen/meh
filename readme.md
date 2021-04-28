@@ -173,3 +173,9 @@ During a Meh-ra-thon, I wanted to have a way to get my computer to alert me when
 Since this is a Rust program, you could also use the types defined here in your own Rust application. I am not planning
 on publishing this to Crates.io since it seems silly but you could use it like so:
 
+```toml
+# Cargo.toml
+
+[dependencies]
+meh = { git = "https://github.com/FreeMasen/meh" }
+```

@@ -33,7 +33,7 @@ mod lib {
 mod bin {
 
     static KEY: &str = include_str!("../apikey");
-    use chrono::{DateTime, Datelike, Duration, FixedOffset, Local, ParseError, TimeZone, Utc};
+    use chrono::{DateTime, Datelike, Duration, FixedOffset, Local, TimeZone, Utc};
     use indicatif::{MultiProgress, ProgressBar, ProgressStyle};
     use log::debug;
 

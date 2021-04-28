@@ -3,19 +3,15 @@ use serde::{Deserialize, Serialize};
 #[derive(Debug, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Video {
+    /// Unique ID
     pub id: String,
+    /// When did it start?
     pub start_date: DateTime<Utc>,
+    /// What is it called?
     pub title: String,
+    /// Where can I find it?
     pub url: String,
-    pub topic: Topic,
+    /// Forum Topic Information
+    pub topic: crate::Topic,
 }
-#[derive(Debug, Deserialize, Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct Topic {
-    pub comment_count: u32,
-    pub created_at: DateTime<Utc>,
-    pub id: String,
-    pub reply_count: u32,
-    pub url: String,
-    pub vote_count: u32,
-}
+
