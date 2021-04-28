@@ -1,8 +1,8 @@
 /target
 **/*.rs.bk
 apikey
-meh
-meh.exe
+/meh
+/meh.exe
 *.ps1
 *.sh
 out.*

@@ -1,0 +1,1 @@
+initSidebarItems({"fn":[["construct_url","Build a meh api url using the provided `api_key`"]],"struct":[["Deal","Description of the current deal on meh.com"],["Poll",""],["Response","The response from a call to the meh api endpoint"],["Topic",""],["Video",""]]});
