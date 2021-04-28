@@ -3,6 +3,7 @@
 apikey
 meh
 meh.exe
-alert.ps1
-alert.sh
+*.ps1
+*.sh
 out.*
+/.vscode
