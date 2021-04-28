@@ -1,5 +1,32 @@
 # Meh-rs
 
+# lib
+
+For use building Rust applications that consume the Meh API. 
+
+Usage:
+
+```rust
+use meh::{Deal, Poll, Response, Video};
+static KEY: &str = include_str!("path/to/api/key");
+
+fn main() -> Result<(), Box<dyn std::error::Error>> {
+    let url = meh::construct_url(KEY);
+    let json = make_network_request();
+    let r: Response = from_str(&json);
+    println!("{}", r.deal.title);
+    println!("{}", r.poll.title);
+    println!("{}", r.video.title);
+}
+
+fn make_network_request(url: &str) -> String {
+    // get your json somehow
+    // ..snip..
+}
+```
+
+# bin
+
 This is a binary application for consuming the [Meh.com API](https://meh.com/forum/topics/meh-api).
 
 ## Usage
@@ -66,7 +93,9 @@ There is a second argument that will control what information is passed to the a
 it will the first line of the progress text or, you could also pass `title` to just get the deal's title, or you could pass `json` for the full JSON blob that the meh api returns.
 
 ### Alert Example
+
 #### Windows
+
 ```powershell
 # ./alert.ps1
 param (
@@ -101,18 +130,28 @@ meh.exe -a ./alert.ps1 -t title-price
 Which might look like this:
 ![windows alert box](assets/meh_alert.jpg)
 
-#### Unix
+#### Ubuntu
 This example assumes an Ubuntu system with `notify-send` installed, 
 
 ```bash
 # ./alert.sh
-notify-send "New Meh.com deal" "$1"
+notify-send "New Meh.com deal" "$*"
 ```
 The above should display an alert that might look something like this:
 
 ![Ubuntu alert box](assets/ubuntu_alert.png)
 
-#Download
+#### MacOS
+
+This examples uses the oa scripting utility to create an alert
+
+```bash
+# ./alert.sh
+/usr/bin/osascript -e "display notification \"$*\" with title \"Meh Update\" sound name \"Frog\""
+```
+
+# Download
+
 The Releases tab above will have a pre-built copy for x86_64 Windows and Linux and MacOs as well as Arm7 Linux (RaspberryPi 3).
 
 If you need a bespoke binary, you can build it using the Rust-Lang build tools [find out more here](https://rustup.rs).
@@ -134,29 +173,3 @@ During a Meh-ra-thon, I wanted to have a way to get my computer to alert me when
 Since this is a Rust program, you could also use the types defined here in your own Rust application. I am not planning
 on publishing this to Crates.io since it seems silly but you could use it like so:
 
-```toml
-# ./Cargo.toml
-# ..snip..
-meh = { git = https://github.com/FreeMasen/meh }
-```
-
-```rust
-// ./src/main.rs
-
-use meh::{Deal, Poll, Response, Video};
-use serde_json::from_str();
-fn main() {
-    // get your json somehow
-    let json = get_meh_json();
-    let r: Response = from_str(&json);
-    println!("{}", r.deal.title);
-    println!("{}", r.poll.title);
-    println!("{}", r.video.title);
-}
-
-fn get_meh_json() -> String {
-    // get your json somehow
-    // ..snip..
-}
-
-```

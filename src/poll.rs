@@ -7,7 +7,7 @@ pub struct Poll {
     pub id: String,
     pub start_date: DateTime<Utc>,
     pub title: String,
-    pub topic: Topic,
+    pub topic: Option<Topic>,
 }
 
 #[derive(Debug, Deserialize, Serialize)]
