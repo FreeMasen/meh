@@ -1,4 +1,4 @@
-use chrono::{DateTime, Utc};
+use time::OffsetDateTime;
 use serde::{Deserialize, Serialize};
 #[derive(Debug, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -8,7 +8,8 @@ pub struct Poll {
     /// Unique id for this poll
     pub id: String,
     /// When did this poll start?
-    pub start_date: DateTime<Utc>,
+    #[serde(with = "time::serde::rfc3339")]
+    pub start_date: OffsetDateTime,
     /// The poll question
     pub title: String,
     /// Forum topic info
@@ -25,5 +26,3 @@ pub struct Answer {
     /// How many people mashed this one
     pub vote_count: u32,
 }
-
-

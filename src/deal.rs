@@ -1,4 +1,4 @@
-use chrono::{DateTime, Utc};
+use time::OffsetDateTime;
 use serde::{Deserialize, Serialize};
 #[derive(Debug, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -28,7 +28,12 @@ pub struct Deal {
     /// The direct url to this item
     pub url: String,
     /// When this deal will expire
-    pub end_date: Option<DateTime<Utc>>,
+    #[serde(
+        with = "time::serde::rfc3339::option",
+        default,
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub end_date: Option<OffsetDateTime>,
 }
 
 #[derive(Debug, Deserialize, Serialize)]
@@ -49,7 +54,8 @@ pub struct Item {
 #[serde(rename_all = "camelCase")]
 pub struct Launch {
     /// If this sold out... when?
-    pub sold_out_at: Option<DateTime<Utc>>,
+    #[serde(with = "time::serde::rfc3339::option",)]
+    pub sold_out_at: Option<OffsetDateTime>,
 }
 #[derive(Debug, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]

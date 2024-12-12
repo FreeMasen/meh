@@ -1,5 +1,5 @@
 //! Meh!
-use chrono::{DateTime, Utc};
+use time::OffsetDateTime;
 use serde::{Deserialize, Serialize};
 mod deal;
 mod poll;
@@ -9,8 +9,8 @@ pub use deal::Deal;
 pub use poll::Poll;
 pub use video::Video;
 
-#[derive(Debug, Deserialize, Serialize)]
 /// The response from a call to the meh api endpoint
+#[derive(Debug, Deserialize, Serialize)]
 pub struct Response {
     /// The current deal
     pub deal: Deal,
@@ -28,7 +28,8 @@ pub struct Topic {
     /// How many people commented on it?
     pub comment_count: u32,
     /// When was this created?
-    pub created_at: DateTime<Utc>,
+    #[serde(with = "time::serde::rfc3339",)]
+    pub created_at: OffsetDateTime,
     /// Unique ID
     pub id: String,
     /// How many replies to it?
